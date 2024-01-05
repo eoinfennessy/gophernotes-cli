@@ -1,0 +1,56 @@
+#!/bin/bash
+
+help() {
+  echo "Usage:"
+  echo "  gophernotes start               Starts the server container"
+  echo "  gophernotes stop                Stops the server and removes container"
+  echo "  gophernotes url                 Prints the URL of the running server"
+  echo "  gophernotes help                Prints the help message"
+}
+
+start() {
+  docker run --name gophernotes --detach -p 8888:8888 gopherdata/gophernotes > /dev/null
+  # wait for runtime config file to exist
+  docker exec gophernotes /bin/sh -c "until [ -f /root/.local/share/jupyter/runtime/nbserver-1.json ]; do sleep 1; done"
+  echo "Server started:"
+  print_url
+}
+
+stop() {
+  docker stop gophernotes > /dev/null && docker rm gophernotes > /dev/null
+}
+
+print_url() {
+  token=$(docker exec gophernotes grep "token" /root/.local/share/jupyter/runtime/nbserver-1.json | awk '{ print $2 }' | sed 's/[\",]//g')
+  echo "http://127.0.0.1:8888?token=$token"
+}
+
+main() {
+  if [ ! $# -eq 1 ]; then
+    echo "Exactly one argument should be passed."
+    help
+    exit 1
+  fi
+
+  case $1 in
+    start)
+    start
+    ;;
+    stop)
+    stop
+    ;;
+    url)
+    print_url
+    ;;
+    help|--help|-h)
+    help
+    ;;
+    *)
+    echo "Unknown option: $1"
+    help
+    exit 1
+    ;;
+  esac
+}
+
+main $1
